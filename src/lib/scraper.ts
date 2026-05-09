@@ -65,6 +65,7 @@ function matchesFollowerRange(followers: number, ranges: string[]): boolean {
     switch (range) {
       case 'under1k': return followers < 1000;
       case '1k-10k': return followers >= 1000 && followers < 10000;
+      case '10k-100k': return followers >= 10000 && followers < 100000;
       case '100k-1m': return followers >= 100000 && followers < 1000000;
       case '1m-5m': return followers >= 1000000 && followers < 5000000;
       case 'over5m': return followers >= 5000000;
@@ -240,7 +241,7 @@ export async function scrape(keywords: string[], options: ScrapeOptions): Promis
     console.log(`\n⚠️ 结果不足 ${targetLimit}，自动放宽筛选条件...`);
 
     // 尝试扩大粉丝区间范围
-    const allRanges = ['under1k', '1k-10k', '100k-1m', '1m-5m', 'over5m'];
+    const allRanges = ['under1k', '1k-10k', '10k-100k', '100k-1m', '1m-5m', 'over5m'];
 
     // 添加更多未选中的粉丝区间
     const additionalRanges = allRanges.filter((r) => !originalRanges.includes(r));
