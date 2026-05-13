@@ -1,290 +1,342 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import {
-  Download,
-  LayoutGrid,
-  List,
-  Moon,
-  Sun,
-  Sparkles,
-} from 'lucide-react';
-import { Creator, Theme, ViewMode } from '../types';
-import { Sidebar } from '../components/Sidebar';
-import { SearchBar } from '../components/SearchBar';
-import { StatsGrid } from '../components/StatsGrid';
-import { CreatorCard } from '../components/CreatorCard';
-import HeroBanner from '../components/HeroBanner';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { ArrowRight, Menu, X, Search, Heart, Sparkles } from 'lucide-react';
+import { Theme } from '../types';
+
+// ShinyText Component with animated gradient
+const ShinyText = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => {
+  return (
+    <span className={`relative inline-block ${className}`}>
+      <motion.span
+        className="absolute inset-0 pointer-events-none"
+        animate={{
+          x: ['-200%', '200%'],
+        }}
+        transition={{
+          duration: 3,
+          repeat: Infinity,
+          repeatDelay: 1,
+          ease: 'linear',
+        }}
+        style={{
+          background: 'linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+        }}
+      />
+      <span className="relative">
+        {children}
+      </span>
+    </span>
+  );
+};
 
 export default function Home() {
-  const [keywords, setKeywords] = useState('');
-  const [keywordTags, setKeywordTags] = useState<string[]>([]);
-  const [followerRanges, setFollowerRanges] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState('views');
-  const [limit, setLimit] = useState(20);
-  const [results, setResults] = useState<Creator[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searched, setSearched] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(true);
-  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [theme, setTheme] = useState<Theme>('light');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
-
-  const handleKeywordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setKeywords(value);
-    const tags = value.split(/[,，]/).map(t => t.trim()).filter(t => t.length > 0);
-    setKeywordTags(tags);
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    const newTags = keywordTags.filter(t => t !== tagToRemove);
-    setKeywordTags(newTags);
-    setKeywords(newTags.join(', '));
-  };
-
-  const handleRangeToggle = (value: string) => {
-    setFollowerRanges((prev) =>
-      prev.includes(value) ? prev.filter((r) => r !== value) : [...prev, value]
-    );
-  };
-
-  const handleSearch = async () => {
-    if (!keywords.trim()) return;
-
-    setLoading(true);
-    setError(null);
-    setSearched(true);
-
-    try {
-      const res = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords: keywords.trim(), followerRanges, sortBy, limit }),
-      });
-
-      if (!res.ok) throw new Error('采集失败');
-      const data = await res.json();
-      setResults(data.creators || []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '未知错误');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExport = useCallback(() => {
-    if (results.length === 0) return;
-
-    const headers = ['Username', 'Nickname', 'Followers', 'Videos', 'Best Video Plays', 'Email', 'Bio', 'Profile URL', 'Keyword'];
-    const rows = results.map(r => [
-      r.unique_id,
-      r.nickname,
-      r.follower_count,
-      r.video_count,
-      r.best_video_plays,
-      r.email || '',
-      r.bio || '',
-      r.profile_url,
-      r.search_keyword
-    ]);
-
-    const csv = [headers.join(','), ...rows.map(r => r.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))].join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `tiktok-kol-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-  }, [results]);
-
-  const copyEmail = (email: string) => {
-    navigator.clipboard.writeText(email);
-    setCopiedEmail(email);
-    setTimeout(() => setCopiedEmail(null), 2000);
-  };
-
-  const stats = useMemo(() => {
-    const emailCount = results.filter((r) => r.email).length;
-    const totalFollowers = results.reduce((sum, r) => sum + r.follower_count, 0);
-    const totalPlays = results.reduce((sum, r) => sum + r.best_video_plays, 0);
-    return {
-      total: results.length,
-      emailCount,
-      emailRate: results.length > 0 ? Math.round((emailCount / results.length) * 100) : 0,
-      avgFollowers: results.length > 0 ? Math.round(totalFollowers / results.length) : 0,
-      totalPlays,
-    };
-  }, [results]);
-
-  const sortedResults = useMemo(() => {
-    const sorted = [...results];
-    switch (sortBy) {
-      case 'views':
-        return sorted.sort((a, b) => b.best_video_plays - a.best_video_plays);
-      case 'followers':
-        return sorted.sort((a, b) => b.follower_count - a.follower_count);
-      case 'email':
-        return sorted.sort((a, b) => {
-          if (a.email && !b.email) return -1;
-          if (!a.email && b.email) return 1;
-          return b.best_video_plays - a.best_video_plays;
-        });
-      case 'latest':
-      default:
-        return sorted;
-    }
-  }, [results, sortBy]);
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toString();
-  };
+  const navLinks = [
+    { label: '首页', href: '/' },
+    { label: '搜索达人', href: '/search' },
+    { label: '我的收藏', href: '/search?saved=true' },
+  ];
 
   return (
-    <div className={`min-h-screen transition-colors duration-500 font-sans tracking-tight ${
-      theme === 'light' ? 'bg-[#FAFAFA]' : 'bg-black text-white'
+    <div className={`relative min-h-screen font-sans ${
+      theme === 'light' ? 'bg-gray-50' : 'bg-zinc-950'
     }`}>
-      {/* Decorative Atmospheric Glow */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none select-none">
-        <div className={`absolute -top-[10%] -right-[10%] w-[600px] h-[600px] rounded-full blur-[120px] opacity-10 ${theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-900'}`} />
-        <div className={`absolute -bottom-[10%] -left-[10%] w-[500px] h-[500px] rounded-full blur-[100px] opacity-5 ${theme === 'light' ? 'bg-emerald-100' : 'bg-zinc-900'}`} />
+      {/* Video Background - Dark abstract pattern for TikTok KOL theme */}
+      <div className="fixed inset-0 z-0">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-30"
+        >
+          <source
+            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4"
+            type="video/mp4"
+          />
+        </video>
+        <div className={`absolute inset-0 ${theme === 'light' ? 'bg-white/80' : 'bg-zinc-950/80'}`} />
       </div>
 
-      <Sidebar theme={theme} />
+      {/* Navigation */}
+      <nav className="relative z-20 border-b border-black/10 dark:border-white/10">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                theme === 'light' ? 'bg-teal-500' : 'bg-teal-600'
+              }`}>
+                <span className="text-white font-bold text-lg">K</span>
+              </div>
+              <span className={`font-semibold text-base ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                KOL Hunter
+              </span>
+            </Link>
 
-      <main className="lg:ml-64 relative min-h-screen">
-        {/* Pro Header */}
-        <header className={`sticky top-0 z-30 px-10 py-6 transition-all ${
-          theme === 'light' ? 'bg-white/80 backdrop-blur-md border-b border-zinc-100' : 'bg-black/60 backdrop-blur-md border-b border-white/5'
-        }`}>
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-600'}`}>Operational Suite Pro</span>
-              <span className={theme === 'light' ? 'text-zinc-100' : 'text-white/10'}>|</span>
-              <span className={`text-xs font-bold uppercase tracking-widest ${theme === 'light' ? 'text-zinc-900' : 'text-white'}`}>TikTok Intelligence Center</span>
+            {/* Desktop Nav - Pill style */}
+            <div className="hidden lg:flex items-center">
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${
+                theme === 'light'
+                  ? 'border-gray-200 bg-white/80'
+                  : 'border-white/10 bg-black/30'
+              }`}>
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                      theme === 'light'
+                        ? 'text-gray-600 hover:text-teal-600 hover:bg-teal-50'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className={`hidden sm:flex items-center gap-2 pr-4 border-r ${theme === 'light' ? 'border-zinc-200' : 'border-white/10'}`}>
-                <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>Engine Stable</span>
-              </div>
+            {/* Theme Toggle */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={toggleTheme}
-                className={`p-2 rounded-lg transition-all ${theme === 'light' ? 'text-zinc-400 hover:text-zinc-900' : 'text-zinc-500 hover:text-white'}`}
+                onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+                className={`p-2 rounded-full transition-colors ${
+                  theme === 'light'
+                    ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/15'
+                }`}
               >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                {theme === 'light' ? '🌙' : '☀️'}
+              </button>
+
+              {/* Mobile Menu Button */}
+              <button
+                className={`lg:hidden p-2 rounded-lg ${
+                  theme === 'light' ? 'text-gray-600' : 'text-white/70'
+                }`}
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             </div>
           </div>
-        </header>
+        </div>
 
-        <div className="max-w-7xl mx-auto px-10 py-16">
-          {/* Hero Section */}
-          <HeroBanner theme={theme} />
-
-          <SearchBar
-            theme={theme}
-            loading={loading}
-            keywords={keywords}
-            keywordTags={keywordTags}
-            showAdvanced={showAdvanced}
-            followerRanges={followerRanges}
-            sortBy={sortBy}
-            limit={limit}
-            onKeywordChange={handleKeywordChange}
-            onSearch={handleSearch}
-            onRemoveTag={removeTag}
-            onToggleAdvanced={() => setShowAdvanced(!showAdvanced)}
-            onRangeToggle={handleRangeToggle}
-            onSortChange={setSortBy}
-            onLimitChange={setLimit}
-          />
-
-          {/* Error */}
-          {error && (
-            <div className={`border rounded-xl p-4 mb-8 flex items-center gap-3 ${
-              theme === 'light' ? 'bg-red-50 border-red-200 text-red-600' : 'bg-red-500/10 border-red-500/20 text-red-400'
-            }`}>
-              <span className="font-bold">{error}</span>
-            </div>
-          )}
-
-          {searched && !loading && (
-            <div>
-              <StatsGrid stats={stats} theme={theme} formatNumber={formatNumber} />
-
-              <div className="flex items-center justify-between mt-12 mb-8">
-                <div className="flex items-center gap-8">
-                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                    已捕获样本数 <span className="font-mono text-emerald-500">{sortedResults.length}</span> 位达人
-                  </span>
-                  <div className={`flex p-1 rounded-xl ${theme === 'light' ? 'bg-zinc-100' : 'bg-white/5 border border-white/5'}`}>
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? (theme === 'light' ? 'bg-white text-zinc-900 shadow-sm' : 'bg-white text-black shadow-xl') : 'text-zinc-500 hover:text-white'}`}
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? (theme === 'light' ? 'bg-white text-zinc-900 shadow-sm' : 'bg-white text-black shadow-xl') : 'text-zinc-500 hover:text-white'}`}
-                    >
-                      <List className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <button
-                  onClick={handleExport}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold transition-all border ${
-                    theme === 'light' ? 'bg-white border-zinc-200 text-zinc-900 hover:border-emerald-300' : 'bg-zinc-900 border-white/5 text-white hover:border-emerald-500/20'
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className={`lg:hidden border-t ${
+            theme === 'light' ? 'border-gray-200 bg-white' : 'border-white/10 bg-zinc-900'
+          }`}>
+            <div className="px-6 py-4 space-y-2">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`block px-4 py-2.5 text-sm font-medium rounded-lg ${
+                    theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-50'
+                      : 'text-white/70 hover:bg-white/10'
                   }`}
+                  onClick={() => setMobileMenuOpen(false)}
                 >
-                  <Download className="w-4 h-4" /> 导出数据报表
-                </button>
-              </div>
-
-              {sortedResults.length > 0 ? (
-                <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-                  {sortedResults.map((creator) => (
-                    <CreatorCard
-                      key={creator.unique_id}
-                      creator={creator}
-                      theme={theme}
-                      copiedEmail={copiedEmail}
-                      onCopyEmail={copyEmail}
-                      formatNumber={formatNumber}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className={`text-center py-20 backdrop-blur-sm rounded-2xl border ${
-                  theme === 'light' ? 'bg-white/60 border-zinc-200/80' : 'bg-zinc-900/40 border-white/5'
-                }`}>
-                  <p className={theme === 'light' ? 'text-zinc-500' : 'text-zinc-500'}>未找到符合条件的博主</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {loading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className={`h-80 rounded-2xl border animate-pulse ${theme === 'light' ? 'bg-white border-slate-200' : 'bg-white/5 border-white/5'}`} />
+                  {link.label}
+                </Link>
               ))}
             </div>
-          )}
+          </div>
+        )}
+      </nav>
+
+      {/* Hero Content */}
+      <main className="relative z-10">
+        <div className="max-w-7xl mx-auto px-6 py-16 md:py-24">
+          {/* Hero Section */}
+          <div className="text-center mb-20">
+            <motion.p
+              className={`text-xs sm:text-sm tracking-tight mb-6 ${
+                theme === 'light' ? 'text-gray-500' : 'text-white/60'
+              }`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              Precision Discovery for TikTok Creators
+            </motion.p>
+
+            <motion.h1
+              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-semibold tracking-tight leading-[0.9]"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <span className={theme === 'light' ? 'text-gray-900' : 'text-white'}>
+                Find Your Next
+              </span>
+              <br />
+              <ShinyText className={theme === 'light' ? 'text-gray-900' : 'text-white'}>
+                TikTok Creator.
+              </ShinyText>
+            </motion.h1>
+
+            <motion.p
+              className={`mt-8 text-base md:text-lg max-w-2xl mx-auto ${
+                theme === 'light' ? 'text-gray-500' : 'text-white/60'
+              }`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
+              AI 驱动的达人搜索引擎 — 实时 TikTok 数据，精准筛选并联系目标创作者
+            </motion.p>
+
+            {/* CTA Buttons */}
+            <motion.div
+              className="mt-10 flex items-center justify-center gap-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+            >
+              <Link
+                href="/search"
+                className={`group px-6 md:px-8 py-3 md:py-4 rounded-full font-medium flex items-center gap-2 transition-all ${
+                  theme === 'light'
+                    ? 'bg-teal-500 text-white hover:bg-teal-600 shadow-lg shadow-teal-500/25'
+                    : 'bg-teal-500 text-white hover:bg-teal-400 shadow-lg shadow-teal-500/25'
+                }`}
+              >
+                开始搜索
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link
+                href="/search?saved=true"
+                className={`px-6 md:px-8 py-3 md:py-4 rounded-full font-medium border transition-colors ${
+                  theme === 'light'
+                    ? 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    : 'border-white/20 text-white/80 hover:border-white/30 hover:bg-white/10'
+                }`}
+              >
+                查看收藏
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Stats Row */}
+          <motion.div
+            className="flex flex-wrap justify-center gap-8 md:gap-16 mb-20"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            {[
+              { value: '10K+', label: '活跃达人' },
+              { value: '50+', label: '覆盖国家' },
+              { value: '95%', label: '数据准确率' },
+            ].map((stat, i) => (
+              <div key={i} className="text-center">
+                <p className={`text-2xl md:text-3xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  {stat.value}
+                </p>
+                <p className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+                  {stat.label}
+                </p>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* Features Section */}
+          <div className="mb-16">
+            <h3 className={`text-center text-xs sm:text-sm font-medium uppercase tracking-widest mb-10 ${
+              theme === 'light' ? 'text-gray-400' : 'text-white/40'
+            }`}>
+              核心功能
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Feature 1 */}
+              <div className={`group p-6 md:p-8 rounded-2xl border transition-all ${
+                theme === 'light'
+                  ? 'bg-white/80 border-gray-200 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-500/10'
+                  : 'bg-black/30 border-white/10 hover:border-teal-500/30 hover:shadow-lg hover:shadow-teal-500/10'
+              }`}>
+                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center ${
+                  theme === 'light' ? 'bg-teal-50' : 'bg-teal-500/20'
+                }`}>
+                  <Search className={`w-6 h-6 ${theme === 'light' ? 'text-teal-600' : 'text-teal-400'}`} />
+                </div>
+                <h4 className={`text-lg font-semibold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  Smart Search <span className="font-normal text-gray-400">| 智能筛选</span>
+                </h4>
+                <p className={`text-sm leading-relaxed ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+                  多关键词搜索 + 多维度筛选<br />
+                  按粉丝量、内容领域精准定位目标达人
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className={`group p-6 md:p-8 rounded-2xl border transition-all ${
+                theme === 'light'
+                  ? 'bg-white/80 border-gray-200 hover:border-rose-200 hover:shadow-lg hover:shadow-rose-500/10'
+                  : 'bg-black/30 border-white/10 hover:border-rose-500/30 hover:shadow-lg hover:shadow-rose-500/10'
+              }`}>
+                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center ${
+                  theme === 'light' ? 'bg-rose-50' : 'bg-rose-500/20'
+                }`}>
+                  <Heart className={`w-6 h-6 ${theme === 'light' ? 'text-rose-500' : 'text-rose-400'}`} />
+                </div>
+                <h4 className={`text-lg font-semibold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  Instant Contact <span className="font-normal text-gray-400">| 便捷建联</span>
+                </h4>
+                <p className={`text-sm leading-relaxed ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+                  自动提取达人简介中的邮箱<br />
+                  一键导出 CSV，批量联系
+                </p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className={`group p-6 md:p-8 rounded-2xl border transition-all ${
+                theme === 'light'
+                  ? 'bg-white/80 border-gray-200 hover:border-amber-200 hover:shadow-lg hover:shadow-amber-500/10'
+                  : 'bg-black/30 border-white/10 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/10'
+              }`}>
+                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center ${
+                  theme === 'light' ? 'bg-amber-50' : 'bg-amber-500/20'
+                }`}>
+                  <Sparkles className={`w-6 h-6 ${theme === 'light' ? 'text-amber-500' : 'text-amber-400'}`} />
+                </div>
+                <h4 className={`text-lg font-semibold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  AI Scoring <span className="font-normal text-gray-400">| AI 评分</span>
+                </h4>
+                <p className={`text-sm leading-relaxed ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+                  多维度达人价值评估<br />
+                  内容相关性、增长潜力、活跃度综合评分
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Footer */}
+        <footer className={`relative z-10 border-t py-8 ${
+          theme === 'light' ? 'border-gray-200' : 'border-white/10'
+        }`}>
+          <div className="max-w-7xl mx-auto px-6 text-center">
+            <p className={`text-sm ${theme === 'light' ? 'text-gray-400' : 'text-white/40'}`}>
+              KOL Hunter - TikTok 达人搜索工具
+            </p>
+          </div>
+        </footer>
       </main>
     </div>
   );

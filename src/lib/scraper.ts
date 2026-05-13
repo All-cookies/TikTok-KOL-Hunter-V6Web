@@ -4,8 +4,20 @@ const TIKHUB_API_KEY = process.env.TIKHUB_API_KEY || 'oatYGeA5/Fez3UeuBbXNxkTsaR
 
 export interface ScrapeOptions {
   followerRanges: string[];
-  sortBy: 'views' | 'latest' | 'random' | 'hasEmail';
+  sortBy: 'views' | 'latest' | 'random' | 'hasEmail' | 'score';
   limit: number;
+}
+
+export interface KolScore {
+  total: number;
+  grade: 'A' | 'B' | 'C';
+  breakdown: {
+    contentRelevance: number;
+    contactable: number;
+    sizeMatch: number;
+    viralPotential: number;
+    activity: number;
+  };
 }
 
 interface Creator {
@@ -20,6 +32,7 @@ interface Creator {
   best_video_likes: number;
   video_create_time?: number;
   search_keyword: string;
+  video_titles?: string[];
 }
 
 const MAX_PAGES = 4;
@@ -86,6 +99,80 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+// 内容相关性词库（简化版）
+const CONTENT_KEYWORDS: Record<string, string[]> = {
+  beauty: ['makeup', 'skincare', 'cosmetic', 'tutorial', 'routine', 'review', 'haul', 'beauty'],
+  tech: ['review', 'unboxing', 'tech', 'gadget', 'setup', 'device', 'phone', 'laptop'],
+  fashion: ['outfit', 'fashion', 'ootd', 'style', 'clothing', 'dress', 'streetwear'],
+  fitness: ['workout', 'fitness', 'gym', 'exercise', 'training', 'health', 'body'],
+  food: ['recipe', 'cooking', 'food', 'eat', 'meal', 'kitchen', 'chef', 'yummy'],
+  travel: ['travel', 'trip', 'vacation', 'destination', 'explore', 'adventure'],
+  gaming: ['game', 'gaming', 'play', 'stream', 'twitch', 'xbox', 'ps5'],
+  lifestyle: ['vlog', 'daily', 'routine', 'life', 'home', 'decor'],
+  ai: ['ai', 'chatgpt', 'tool', 'productivity', 'software', 'app', 'automation'],
+};
+
+// 计算内容相关性分数
+function calculateContentRelevance(videoTitles: string[], searchKeyword: string): number {
+  if (!videoTitles || videoTitles.length === 0) return 0;
+
+  const keyword = searchKeyword.toLowerCase();
+  const relatedTerms = CONTENT_KEYWORDS[keyword] || [keyword];
+
+  let matches = 0;
+  for (const title of videoTitles) {
+    const lower = title.toLowerCase();
+    if (relatedTerms.some(term => lower.includes(term))) {
+      matches++;
+    }
+  }
+
+  return Math.min(30, matches * 10);
+}
+
+// 计算达人评分
+export function calculateKolScore(
+  creator: Creator,
+  followerRanges: string[],
+  searchKeywords: string[]
+): KolScore {
+  // 1. 内容相关性 (0-30)
+  const contentRelevance = calculateContentRelevance(creator.video_titles || [], searchKeywords[0] || '');
+
+  // 2. 可联系 (0-25)
+  const contactable = creator.email ? 25 : 0;
+
+  // 3. 规模匹配 (0-20)
+  const sizeMatch = matchesFollowerRange(creator.follower_count, followerRanges) ? 20 : 0;
+
+  // 4. 爆款潜力 (0-15)
+  let viralPotential = 0;
+  if (creator.follower_count > 0) {
+    const ratio = creator.best_video_plays / creator.follower_count;
+    if (ratio > 0.5) viralPotential = 15;
+    else if (ratio > 0.2) viralPotential = 10;
+    else if (ratio > 0.05) viralPotential = 5;
+  }
+
+  // 5. 创作活跃度 (0-10)
+  let activity = 0;
+  if (creator.video_count > 30) activity = 10;
+  else if (creator.video_count > 10) activity = 5;
+
+  const total = contentRelevance + contactable + sizeMatch + viralPotential + activity;
+
+  let grade: 'A' | 'B' | 'C';
+  if (total >= 70) grade = 'A';
+  else if (total >= 40) grade = 'B';
+  else grade = 'C';
+
+  return {
+    total,
+    grade,
+    breakdown: { contentRelevance, contactable, sizeMatch, viralPotential, activity }
+  };
+}
+
 async function searchByKeyword(keyword: string): Promise<Map<string, Creator>> {
   const creatorMap = new Map<string, Creator>();
 
@@ -114,6 +201,7 @@ async function searchByKeyword(keyword: string): Promise<Map<string, Creator>> {
 
         const uid = String(a.unique_id);
         const followers = Number(a.follower_count || 0);
+        const videoTitle = String(aweme.desc || aweme.title || '');
 
         const plays = Number(aweme.statistics?.play_count || 0);
         const likes = Number(aweme.statistics?.digg_count || 0);
@@ -126,6 +214,10 @@ async function searchByKeyword(keyword: string): Promise<Map<string, Creator>> {
             existing.best_video_plays = plays;
             existing.best_video_likes = likes;
             existing.video_create_time = createTime;
+            existing.video_titles = existing.video_titles || [];
+            if (videoTitle && !existing.video_titles.includes(videoTitle)) {
+              existing.video_titles.push(videoTitle);
+            }
           }
         } else {
           creatorMap.set(uid, {
@@ -140,6 +232,7 @@ async function searchByKeyword(keyword: string): Promise<Map<string, Creator>> {
             best_video_likes: likes,
             video_create_time: createTime,
             search_keyword: keyword,
+            video_titles: videoTitle ? [videoTitle] : [],
           });
           added++;
         }
@@ -183,6 +276,7 @@ async function enrichProfiles(creatorMap: Map<string, Creator>): Promise<void> {
       c.follower_count = user.followerCount ?? c.follower_count;
       c.video_count = user.videoCount ?? c.video_count;
 
+      // 补全阶段：如果发现新邮箱，更新它
       if (email && !c.email) {
         c.email = email;
         emailFound++;
@@ -226,30 +320,23 @@ export async function scrape(keywords: string[], options: ScrapeOptions): Promis
 
   console.log(`\n📊 Phase 1 完成：去重后 ${allCreators.size} 位博主`);
 
-  // Phase 2: 补全
-  await enrichProfiles(allCreators);
-
-  // Phase 3: 筛选和补充
+  // Phase 2: 先筛选和排序（不补全，快速筛选）
   let filtered = Array.from(allCreators.values());
   const originalRanges = [...followerRanges];
 
-  // 3.1 按粉丝区间筛选
+  // 2.1 按粉丝区间筛选
   if (followerRanges.length > 0) {
     filtered = filtered.filter((c) => matchesFollowerRange(c.follower_count, followerRanges));
-    console.log(`\n📊 粉丝筛选后：${filtered.length} 位`);
+    console.log(`📊 粉丝筛选后：${filtered.length} 位`);
   }
 
-  // 3.2 如果结果不足 limit，自动放宽条件
+  // 2.2 如果结果不足 limit，自动放宽条件
   if (filtered.length < targetLimit) {
-    console.log(`\n⚠️ 结果不足 ${targetLimit}，自动放宽筛选条件...`);
+    console.log(`⚠️ 结果不足 ${targetLimit}，自动放宽筛选条件...`);
 
-    // 尝试扩大粉丝区间范围
     const allRanges = ['under1k', '1k-10k', '10k-50k', '50k-100k', '100k-300k', '300k-500k', '500k-1m', '1m-5m', 'over5m'];
-
-    // 添加更多未选中的粉丝区间
     const additionalRanges = allRanges.filter((r) => !originalRanges.includes(r));
 
-    // 如果还有更多区间可选
     if (additionalRanges.length > 0 && filtered.length < targetLimit) {
       const newRanges = [...followerRanges, ...additionalRanges.slice(0, 2)];
       filtered = Array.from(allCreators.values()).filter((c) =>
@@ -258,14 +345,13 @@ export async function scrape(keywords: string[], options: ScrapeOptions): Promis
       console.log(`📊 放宽粉丝区间后：${filtered.length} 位`);
     }
 
-    // 如果还是不够，直接返回所有已采集的
     if (filtered.length < targetLimit) {
       filtered = Array.from(allCreators.values());
       console.log(`📊 移除粉丝限制，返回全部：${filtered.length} 位`);
     }
   }
 
-  // Phase 4: 排序
+  // 2.3 排序
   switch (sortBy) {
     case 'views':
       filtered.sort((a, b) => b.best_video_plays - a.best_video_plays);
@@ -283,9 +369,54 @@ export async function scrape(keywords: string[], options: ScrapeOptions): Promis
         return b.best_video_plays - a.best_video_plays;
       });
       break;
+    case 'score':
+      // 按评分排序（A级在前，同级按分数降序）
+      filtered.sort((a, b) => {
+        const scoreA = calculateKolScore(a, followerRanges, keywords);
+        const scoreB = calculateKolScore(b, followerRanges, keywords);
+        if (scoreA.grade !== scoreB.grade) {
+          const gradeOrder = { A: 0, B: 1, C: 2 };
+          return gradeOrder[scoreA.grade] - gradeOrder[scoreB.grade];
+        }
+        return scoreB.total - scoreA.total;
+      });
+      break;
   }
 
-  const finalResult = filtered.slice(0, targetLimit);
+  // 2.4 只取目标数量
+  const candidates = filtered.slice(0, targetLimit);
+  console.log(`📊 候选博主：${candidates.length} 位`);
+
+  // Phase 3: 只对最终候选进行补全（优化：减少 API 调用）
+  const candidateMap = new Map<string, Creator>();
+  candidates.forEach(c => candidateMap.set(c.unique_id, c));
+  await enrichProfiles(candidateMap);
+
+  // 更新排序（补全后有邮箱优先或评分排序）
+  if (sortBy === 'hasEmail' || sortBy === 'score') {
+    candidateMap.forEach((c) => {
+      if (c.email) candidateMap.get(c.unique_id)!.email = c.email;
+    });
+    const arr = Array.from(candidateMap.values());
+    arr.sort((a, b) => {
+      if (sortBy === 'score') {
+        const scoreA = calculateKolScore(a, followerRanges, keywords);
+        const scoreB = calculateKolScore(b, followerRanges, keywords);
+        if (scoreA.grade !== scoreB.grade) {
+          const gradeOrder = { A: 0, B: 1, C: 2 };
+          return gradeOrder[scoreA.grade] - gradeOrder[scoreB.grade];
+        }
+        return scoreB.total - scoreA.total;
+      }
+      if (a.email && !b.email) return -1;
+      if (!a.email && b.email) return 1;
+      return b.best_video_plays - a.best_video_plays;
+    });
+    candidateMap.clear();
+    arr.forEach(c => candidateMap.set(c.unique_id, c));
+  }
+
+  const finalResult = Array.from(candidateMap.values());
   console.log(`\n✅ 最终结果：${finalResult.length} 位博主`);
 
   return finalResult;

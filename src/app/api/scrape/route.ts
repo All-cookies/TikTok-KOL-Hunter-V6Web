@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrape, ScrapeOptions } from '@/lib/scraper';
+import { scrape, ScrapeOptions, calculateKolScore, KolScore } from '@/lib/scraper';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +23,13 @@ export async function POST(req: NextRequest) {
 
     const creators = await scrape(keywordList, options);
 
-    return NextResponse.json({ creators, total: creators.length });
+    // 为每个 creator 计算评分
+    const creatorsWithScores = creators.map((creator) => {
+      const score = calculateKolScore(creator, followerRanges || [], keywordList);
+      return { ...creator, score };
+    });
+
+    return NextResponse.json({ creators: creatorsWithScores, total: creatorsWithScores.length });
   } catch (error) {
     console.error('Scrape error:', error);
     return NextResponse.json(

@@ -11,3 +11,18 @@ export const FOLLOWER_RANGES = [
 ];
 
 export const LIMIT_OPTIONS = [10, 20, 50, 100];
+
+export const SORT_OPTIONS = [
+  { value: 'score', label: '智能评分' },
+  { value: 'views', label: '播放量' },
+  { value: 'followers', label: '粉丝量' },
+  { value: 'email', label: '邮箱优先' },
+  { value: 'latest', label: '最新' },
+];
+
+export const GRADE_OPTIONS = [
+  { value: 'all', label: '全部' },
+  { value: 'A', label: 'A级', color: 'emerald' },
+  { value: 'B', label: 'B级', color: 'blue' },
+  { value: 'C', label: 'C级', color: 'zinc' },
+];

@@ -1,108 +1,195 @@
 'use client';
 
 import React from 'react';
-import { ExternalLink, Users, Play, Mail, MailX, Check } from 'lucide-react';
-import { Creator, Theme } from '../types';
+import { ExternalLink, Mail, MailX, Heart, Star } from 'lucide-react';
+import { Creator, Theme, SavedCreator, KolScore } from '../types';
 
 interface CreatorCardProps {
-  creator: Creator;
+  creator: Creator | SavedCreator;
   theme: Theme;
   copiedEmail: string | null;
   onCopyEmail: (email: string) => void;
   formatNumber: (n: number) => string;
+  isSaved?: boolean;
+  onToggleSave?: (uniqueId: string) => void;
+  onClick?: (creator: Creator | SavedCreator) => void;
+  score?: KolScore;
 }
 
-export const CreatorCard: React.FC<CreatorCardProps> = ({ creator, theme, copiedEmail, onCopyEmail, formatNumber }) => {
+const GRADE_STYLES = {
+  A: { bg: 'bg-teal-500', text: 'text-white' },
+  B: { bg: 'bg-slate-400', text: 'text-white' },
+  C: { bg: 'bg-slate-200', text: 'text-slate-600' },
+};
+
+export const CreatorCard: React.FC<CreatorCardProps> = ({
+  creator, theme, copiedEmail, onCopyEmail, formatNumber,
+  isSaved, onToggleSave, onClick, score
+}) => {
+  const savedCreator = creator as SavedCreator;
+  const gradeStyle = score ? GRADE_STYLES[score.grade] : null;
+
   return (
-    <div className={`group rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-1.5 ${
-      theme === 'light'
-        ? 'bg-white border-slate-200 hover:border-slate-400 hover:shadow-2xl shadow-sm'
-        : 'bg-zinc-900 border-white/5 hover:border-white/20 hover:shadow-2xl shadow-black'
-    }`}>
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold border ${
-              theme === 'light'
-                ? 'bg-slate-50 text-slate-900 border-slate-200 shadow-inner'
-                : 'bg-zinc-950 text-white border-white/10 shadow-xl'
+    <div
+      onClick={() => onClick && onClick(creator)}
+      className={`group rounded-lg border bg-white transition-colors duration-150 cursor-pointer ${
+        theme === 'light'
+          ? 'border-gray-200 hover:border-teal-300 hover:shadow-sm'
+          : 'border-white/10 hover:border-teal-500/30 hover:shadow-lg'
+      }`}
+    >
+      <div className="p-4">
+        {/* Header Row */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            {/* Avatar */}
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold ${
+              theme === 'light' ? 'bg-teal-50 text-teal-600' : 'bg-teal-500/20 text-teal-400'
             }`}>
               {creator.unique_id[0].toUpperCase()}
             </div>
-            <div className={`absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-white dark:border-zinc-900 rounded-full shadow-sm`} />
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h4 className={`font-medium text-sm ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  @{creator.unique_id}
+                </h4>
+                {score && gradeStyle && (
+                  <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold ${gradeStyle.bg} ${gradeStyle.text}`}>
+                    <Star className="w-2.5 h-2.5" />
+                    {score.grade}
+                  </span>
+                )}
+              </div>
+              <p className={`text-xs ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                {creator.nickname || '匿名作者'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className={`font-bold transition-colors flex items-center gap-1.5 ${theme === 'light' ? 'text-zinc-900 group-hover:text-emerald-600' : 'text-zinc-100 group-hover:text-emerald-400'}`}>
-              @{creator.unique_id}
-              <a href={creator.profile_url} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </h4>
-            <p className={`text-xs font-bold uppercase tracking-wider ${theme === 'light' ? 'text-zinc-400' : 'text-zinc-500'}`}>{creator.nickname || '匿名作者'}</p>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1">
+            {onToggleSave && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSave(creator.unique_id);
+                }}
+                className={`p-1.5 rounded transition-colors duration-150 ${
+                  isSaved
+                    ? 'text-rose-500'
+                    : theme === 'light'
+                      ? 'text-gray-300 hover:text-rose-500'
+                      : 'text-gray-600 hover:text-rose-500'
+                }`}
+              >
+                <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+              </button>
+            )}
+            <a
+              href={creator.profile_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`p-1.5 rounded transition-colors duration-150 ${
+                theme === 'light'
+                  ? 'text-gray-300 hover:text-teal-600'
+                  : 'text-gray-600 hover:text-teal-400'
+              }`}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
           </div>
         </div>
-        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest border ${
-          theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/5 border-white/10 text-zinc-400'
+
+        {/* Bio */}
+        {creator.bio && (
+          <p className={`text-xs mb-3 line-clamp-1 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+            {creator.bio}
+          </p>
+        )}
+
+        {/* Stats Grid */}
+        <div className={`grid grid-cols-3 gap-2 mb-3 py-2 px-3 rounded-lg ${
+          theme === 'light' ? 'bg-gray-50' : 'bg-white/5'
         }`}>
-          {creator.search_keyword}
-        </span>
-      </div>
+          <div className="text-center">
+            <p className={`text-sm font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+              {formatNumber(creator.follower_count)}
+            </p>
+            <p className={`text-[10px] ${theme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>粉丝</p>
+          </div>
+          <div className="text-center">
+            <p className={`text-sm font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+              {creator.video_count}
+            </p>
+            <p className={`text-[10px] ${theme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>视频</p>
+          </div>
+          <div className="text-center">
+            <p className={`text-sm font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+              {formatNumber(creator.best_video_plays)}
+            </p>
+            <p className={`text-[10px] ${theme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>播放</p>
+          </div>
+        </div>
 
-      <div className={`text-sm mb-6 line-clamp-2 min-h-[2.5rem] leading-relaxed font-medium ${theme === 'light' ? 'text-slate-600' : 'text-zinc-400'}`}>
-        {creator.bio || '该博主暂无个人简介。建议查看其实时主页以获取最新创作趋势。'}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <StatItem icon={Users} label="粉丝总数" value={formatNumber(creator.follower_count)} theme={theme} />
-        <StatItem icon={Play} label="爆款视频播放" value={formatNumber(creator.best_video_plays)} theme={theme} color="blue" />
-      </div>
-
-      <div className={`pt-5 border-t ${theme === 'light' ? 'border-slate-100' : 'border-white/5'}`}>
-        {creator.email ? (
-          <button
-            onClick={() => onCopyEmail(creator.email!)}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-              copiedEmail === creator.email
-                ? 'bg-emerald-500 text-zinc-950 shadow-lg shadow-emerald-500/10'
-                : theme === 'light'
-                  ? 'bg-zinc-900 text-white hover:bg-zinc-800'
-                  : 'bg-zinc-100 text-zinc-950 hover:bg-white'
-            }`}
-          >
-            {copiedEmail === creator.email ? <Check className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-            {copiedEmail === creator.email ? '邮箱已复制' : creator.email}
-          </button>
-        ) : (
-          <div className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border ${
-            theme === 'light' ? 'bg-zinc-50 border-zinc-100 text-zinc-400' : 'bg-transparent border-white/5 text-zinc-600'
-          }`}>
-            <MailX className="w-4 h-4" />
-            暂无公开邮箱
+        {/* Tags (for saved creators) */}
+        {savedCreator.tags && savedCreator.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {savedCreator.tags.slice(0, 2).map((tag, i) => (
+              <span
+                key={i}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                  theme === 'light' ? 'bg-gray-100 text-gray-500' : 'bg-white/10 text-gray-400'
+                }`}
+              >
+                {tag}
+              </span>
+            ))}
+            {savedCreator.tags.length > 2 && (
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                theme === 'light' ? 'bg-gray-100 text-gray-400' : 'bg-white/10 text-gray-500'
+              }`}>
+                +{savedCreator.tags.length - 2}
+              </span>
+            )}
           </div>
         )}
+
+        {/* Email Button */}
+        <div>
+          {creator.email ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopyEmail(creator.email!);
+              }}
+              className={`w-full flex items-center justify-center gap-1.5 py-2 rounded text-xs font-medium transition-colors duration-150 ${
+                copiedEmail === creator.email
+                  ? 'bg-teal-500 text-white'
+                  : theme === 'light'
+                    ? 'bg-teal-50 text-teal-600 hover:bg-teal-100'
+                    : 'bg-teal-500/20 text-teal-400 hover:bg-teal-500/30'
+              }`}
+            >
+              {copiedEmail === creator.email ? (
+                <>已复制</>
+              ) : (
+                <>
+                  <Mail className="w-3 h-3" />
+                  {creator.email}
+                </>
+              )}
+            </button>
+          ) : (
+            <div className={`w-full flex items-center justify-center gap-1.5 py-2 rounded text-xs ${
+              theme === 'light' ? 'bg-gray-50 text-gray-400' : 'bg-white/5 text-gray-500'
+            }`}>
+              <MailX className="w-3 h-3" />
+              暂无邮箱
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
-
-const StatItem = ({ icon: Icon, label, value, theme, color }: any) => (
-  <div className={`p-3 rounded-xl border transition-all duration-300 ${
-    theme === 'light'
-      ? 'bg-zinc-50 border-zinc-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 shadow-sm'
-      : 'bg-zinc-950 border-white/5 group-hover:border-emerald-500/20 group-hover:bg-emerald-500/5'
-  }`}>
-    <div className={`flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold mb-1 transition-colors ${
-      theme === 'light' ? 'text-zinc-400 group-hover:text-emerald-400' : 'text-zinc-500 group-hover:text-emerald-400'
-    }`}>
-      <Icon className="w-3 h-3" />
-      {label}
-    </div>
-    <div className={`text-sm font-bold transition-colors ${
-      color === 'blue'
-        ? (theme === 'light' ? 'text-emerald-600' : 'text-emerald-400')
-        : (theme === 'light' ? 'text-zinc-900 group-hover:text-emerald-600' : 'text-zinc-100 group-hover:text-emerald-300')
-    }`}>
-      {value}
-    </div>
-  </div>
-);
