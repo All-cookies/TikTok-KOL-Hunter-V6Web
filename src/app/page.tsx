@@ -161,7 +161,7 @@ export default function Home() {
 
       {/* Hero Content */}
       <main className="relative z-10">
-        <div className="max-w-7xl mx-auto px-6 py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-6 py-16 md:py-20">
           {/* Hero Section */}
           <div className="text-center mb-20">
             <motion.p
@@ -176,7 +176,7 @@ export default function Home() {
             </motion.p>
 
             <motion.h1
-              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-semibold tracking-tight leading-[0.9]"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-semibold tracking-normal leading-[0.9]"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
@@ -191,7 +191,7 @@ export default function Home() {
             </motion.h1>
 
             <motion.p
-              className={`mt-8 text-base md:text-lg max-w-2xl mx-auto ${
+              className={`mt-4 text-base md:text-lg max-w-2xl mx-auto ${
                 theme === 'light' ? 'text-gray-500' : 'text-white/60'
               }`}
               initial={{ opacity: 0, y: 20 }}
@@ -203,7 +203,7 @@ export default function Home() {
 
             {/* CTA Buttons */}
             <motion.div
-              className="mt-10 flex items-center justify-center gap-4"
+              className="mt-10 flex items-center justify-center gap-4 mb-2"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.5 }}
@@ -233,7 +233,7 @@ export default function Home() {
           </div>
 
           {/* Stats Row */}
-          <motion.div
+          {/* <motion.div
             className="flex flex-wrap justify-center gap-8 md:gap-16 mb-20"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -253,11 +253,11 @@ export default function Home() {
                 </p>
               </div>
             ))}
-          </motion.div>
+          </motion.div> */}
 
           {/* Features Section */}
-          <div className="mb-16">
-            <h3 className={`text-center text-xs sm:text-sm font-medium uppercase tracking-widest mb-10 ${
+          <div className="mb-3 -mt-10">
+            <h3 className={`text-center text-xs sm:text-sm font-medium uppercase tracking-widest mb-6 ${
               theme === 'light' ? 'text-gray-400' : 'text-white/40'
             }`}>
               核心功能
@@ -265,12 +265,12 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Feature 1 */}
-              <div className={`group p-6 md:p-8 rounded-2xl border transition-all ${
+              <div className={`group p-4 md:p-6 rounded-2xl border transition-all text-center ${
                 theme === 'light'
                   ? 'bg-white/80 border-gray-200 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-500/10'
                   : 'bg-black/30 border-white/10 hover:border-teal-500/30 hover:shadow-lg hover:shadow-teal-500/10'
               }`}>
-                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center ${
+                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center mx-auto ${
                   theme === 'light' ? 'bg-teal-50' : 'bg-teal-500/20'
                 }`}>
                   <Search className={`w-6 h-6 ${theme === 'light' ? 'text-teal-600' : 'text-teal-400'}`} />
@@ -285,12 +285,12 @@ export default function Home() {
               </div>
 
               {/* Feature 2 */}
-              <div className={`group p-6 md:p-8 rounded-2xl border transition-all ${
+              <div className={`group p-5 md:p-6 rounded-2xl border transition-all text-center ${
                 theme === 'light'
                   ? 'bg-white/80 border-gray-200 hover:border-rose-200 hover:shadow-lg hover:shadow-rose-500/10'
                   : 'bg-black/30 border-white/10 hover:border-rose-500/30 hover:shadow-lg hover:shadow-rose-500/10'
               }`}>
-                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center ${
+                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center mx-auto ${
                   theme === 'light' ? 'bg-rose-50' : 'bg-rose-500/20'
                 }`}>
                   <Heart className={`w-6 h-6 ${theme === 'light' ? 'text-rose-500' : 'text-rose-400'}`} />
@@ -305,12 +305,12 @@ export default function Home() {
               </div>
 
               {/* Feature 3 */}
-              <div className={`group p-6 md:p-8 rounded-2xl border transition-all ${
+              <div className={`group p-4 md:p-6 rounded-2xl border transition-all text-center ${
                 theme === 'light'
                   ? 'bg-white/80 border-gray-200 hover:border-amber-200 hover:shadow-lg hover:shadow-amber-500/10'
                   : 'bg-black/30 border-white/10 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/10'
               }`}>
-                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center ${
+                <div className={`w-12 h-12 mb-5 rounded-xl flex items-center justify-center mx-auto ${
                   theme === 'light' ? 'bg-amber-50' : 'bg-amber-500/20'
                 }`}>
                   <Sparkles className={`w-6 h-6 ${theme === 'light' ? 'text-amber-500' : 'text-amber-400'}`} />

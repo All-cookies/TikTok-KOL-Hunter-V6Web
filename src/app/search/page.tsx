@@ -258,7 +258,7 @@ export default function SearchPage() {
 
           {/* Loading Skeleton */}
           {activeTab === 'search' && loading && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-[1500px] aspect-[4/5]">
               {[...Array(10)].map((_, i) => (
                 <div key={i} className={`h-48 rounded-lg animate-pulse ${
                   theme === 'light' ? 'bg-white border border-gray-200' : 'bg-zinc-800 border border-white/10'
@@ -271,7 +271,7 @@ export default function SearchPage() {
           {activeTab === 'search' && searched && !loading && (
             <div>
               {sortedResults.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-[1500px] aspect-[4/5]">
                   {sortedResults.map((creator) => (
                     <CreatorTooltip
                       key={creator.unique_id}
@@ -322,7 +322,7 @@ export default function SearchPage() {
           {activeTab === 'saved' && (
             <div>
               {savedCreators.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-[1500px] aspect-[4/5]">
                   {savedCreators.map((creator) => (
                     <CreatorTooltip
                       key={creator.unique_id}
