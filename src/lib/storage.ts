@@ -1,11 +1,11 @@
 import { Creator, SavedCreator } from '../types';
 
-const SAVED_KEY = 'kol-hunter-saved';
+const STORAGE_KEY = 'kol-hunter-saved';
 
 export function getSavedCreators(): SavedCreator[] {
   if (typeof window === 'undefined') return [];
   try {
-    const data = localStorage.getItem(SAVED_KEY);
+    const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : [];
   } catch {
     return [];
@@ -15,21 +15,21 @@ export function getSavedCreators(): SavedCreator[] {
 export function saveCreator(creator: Creator): SavedCreator {
   const saved: SavedCreator = {
     ...creator,
-    savedAt: Date.now(),
+    saved_at: Date.now(),
     tags: [],
     notes: '',
   };
   const existing = getSavedCreators();
   const filtered = existing.filter(c => c.unique_id !== creator.unique_id);
   const updated = [saved, ...filtered];
-  localStorage.setItem(SAVED_KEY, JSON.stringify(updated));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   return saved;
 }
 
 export function removeCreator(uniqueId: string): void {
   const existing = getSavedCreators();
   const updated = existing.filter(c => c.unique_id !== uniqueId);
-  localStorage.setItem(SAVED_KEY, JSON.stringify(updated));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 }
 
 export function updateCreatorTags(uniqueId: string, tags: string[]): void {
@@ -37,7 +37,7 @@ export function updateCreatorTags(uniqueId: string, tags: string[]): void {
   const updated = existing.map(c =>
     c.unique_id === uniqueId ? { ...c, tags } : c
   );
-  localStorage.setItem(SAVED_KEY, JSON.stringify(updated));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 }
 
 export function updateCreatorNotes(uniqueId: string, notes: string): void {
@@ -45,7 +45,7 @@ export function updateCreatorNotes(uniqueId: string, notes: string): void {
   const updated = existing.map(c =>
     c.unique_id === uniqueId ? { ...c, notes } : c
   );
-  localStorage.setItem(SAVED_KEY, JSON.stringify(updated));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 }
 
 export function isCreatorSaved(uniqueId: string): boolean {
