@@ -38,6 +38,8 @@ interface Creator {
   video_create_time?: number;
   search_keyword: string;
   video_titles?: string[];
+  has_bio_link?: boolean;
+  bio_link?: string | null;
 }
 
 const MAX_PAGES = 4;
@@ -64,16 +66,47 @@ function sleep(ms: number) {
 
 function extractEmail(text: string): string | null {
   if (!text) return null;
+  // 支持多种邮箱格式
   const normalized = text
     .replace(/\[at\]/gi, '@')
     .replace(/\(at\)/gi, '@')
     .replace(/ at /gi, '@')
     .replace(/\[dot\]/gi, '.')
     .replace(/\(dot\)/gi, '.')
-    .replace(/ dot /gi, '.');
+    .replace(/ dot /gi, '.')
+    .replace(/✉/g, '@')
+    .replace(/📧/g, '')
+    .replace(/联系我[:：]/gi, '')
+    .replace(/商务[:：]/gi, '')
+    .replace(/合作[:：]/gi, '')
+    .replace(/email[:：\s]/gi, '')
+    .replace(/mail[:：\s]/gi, '')
+    .replace(/联系我/g, '')
+    .replace(/商务合作/g, '')
+    .replace(/发送邮件/g, '');
 
-  const m = normalized.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  // 增强正则：支持更多变体
+  const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+  const m = normalized.match(emailRegex);
   return m ? m[0].toLowerCase() : null;
+}
+
+// 从 video titles 提取邮箱（有些博主在视频描述留邮箱）
+function extractEmailFromTitles(videoTitles: string[]): string | null {
+  if (!videoTitles || videoTitles.length === 0) return null;
+  for (const title of videoTitles) {
+    const email = extractEmail(title);
+    if (email) return email;
+  }
+  return null;
+}
+
+// 从落地页链接推断是否有商务联系方式（但不直接提取，只加分）
+function hasBusinessLink(bioLink: string | null): boolean {
+  if (!bioLink) return false;
+  const businessDomains = ['linktree', 'linkinbio', 'beacons', 'carrd', 'about', 'contact'];
+  const lower = bioLink.toLowerCase();
+  return businessDomains.some(d => lower.includes(d)) || lower.includes('.com');
 }
 
 function matchesFollowerRange(followers: number, ranges: string[]): boolean {
@@ -291,41 +324,61 @@ function calculateContentRelevance(videoTitles: string[], searchKeywords: string
   return Math.min(30, matches * 10);
 }
 
-// 竞品词库（已被竞品教育过的创作者）
-const COMPETITOR_KEYWORDS = [
-  'petlibro', 'neakasa', 'litter robot', ' 自动猫砂盆', '自动铲屎',
-  'cat litter robot', 'self cleaning litter', 'smart litter box',
-];
-
-// 场景词库（高意向购买场景）
-const SCENE_KEYWORDS = [
-  'multi cat', 'cat care', 'cat parent', 'busy cat owner', 'cat life',
-  'feline family', 'cat household', 'kitty family', '多猫家庭', '养猫日常',
-  'cat routine', '猫砂盆推荐', '智能养猫',
-];
-
-// 品类关键词（判断 bio 是否属于目标品类）
-const CATEGORY_KEYWORDS = [
-  'cat', 'kitten', 'pet', 'feline', 'animal', 'fur',
-  '猫', '猫咪', '宠物', '汪星人', '汪',
-];
-
-// 建联信号词（bio 中含有合作意向）
+// 通用信号词（与关键词无关，任何品类都适用）
 const COLLAB_SIGNALS = [
   'pr', 'collab', 'collaboration', 'business', 'contact', 'email',
   'sponsorship', 'partnership', 'brand', '广告', '合作', '商务',
   '推广', '投放', '合作请私信',
 ];
+const LINK_PATTERNS = ['link', 'bio', 'website', 'shop', 'store', 'youtube', 'instagram'];
 
-// 计算单维度得分
-function score(hasEmail: boolean): number { return hasEmail ? 30 : 0; }
+// 从搜索关键词动态生成词库（用于 bio 匹配）
+function buildBioMatchWords(searchKeywords: string[]): Set<string> {
+  const words = new Set<string>();
+  for (const kw of searchKeywords) {
+    const lower = kw.toLowerCase().trim();
+    if (!lower) continue;
+    words.add(lower);
+    // 空格分割子词（"cat litter" -> "cat", "litter"）
+    lower.split(/\s+/).forEach(part => {
+      if (part.length >= 2) words.add(part);
+    });
+    // 移除常见停用词后的有意义子词
+    const stopWords = new Set(['the', 'and', 'for', 'with', 'best', 'top', 'how']);
+    lower.split(/\s+/).forEach(part => {
+      if (part.length >= 4 && !stopWords.has(part)) words.add(part);
+    });
+  }
+  return words;
+}
 
+// 从搜索关键词提取场景词（描述使用场景的词）
+function extractSceneWords(searchKeywords: string[]): Set<string> {
+  const sceneWords = new Set<string>();
+  const sceneIndicators = [
+    'care', 'routine', 'daily', 'life', 'home', 'family', 'tips',
+    'guide', 'how', 'review', 'test', 'setup', 'tour', 'vlog',
+    '使用', '日常', '教程', '测评', '体验', '生活',
+  ];
+  for (const kw of searchKeywords) {
+    const lower = kw.toLowerCase();
+    const parts = lower.split(/\s+/);
+    for (const part of parts) {
+      if (sceneIndicators.includes(part) || part.length >= 4) {
+        sceneWords.add(part);
+      }
+    }
+  }
+  return sceneWords;
+}
+
+// 解析粉丝区间格式
 function parseFollowerRange(range: string): { min: number; max: number } | null {
   // 处理 FilterBar 格式: '0-10000'
   if (range.includes('-') && !range.includes('k') && !range.includes('m')) {
     const [minStr, maxStr] = range.split('-');
     const min = parseInt(minStr);
-    const max = parseInt(maxStr);
+    const max = maxStr === 'inf' ? Infinity : parseInt(maxStr);
     if (!isNaN(min) && !isNaN(max)) return { min, max };
   }
   // 处理 scraper 格式: 'under1k', '1k-10k', etc.
@@ -343,77 +396,66 @@ function parseFollowerRange(range: string): { min: number; max: number } | null 
   return rangeMap[range] || null;
 }
 
+// 粉丝区间评分
 function scoreSize(followerCount: number, followerRanges: string[]): number {
-  // 如果没有设置粉丝区间，默认 5K-5M 为目标区间
   if (followerRanges.length === 0) {
     return (followerCount >= 5000 && followerCount < 5000000) ? 20 : 0;
   }
-
-  // 用户选择了具体区间，检查是否落在目标区间内
   return followerRanges.some(range => {
     const parsed = parseFollowerRange(range);
     return parsed && followerCount >= parsed.min && followerCount < parsed.max;
   }) ? 20 : 0;
 }
 
-function scoreBioCategory(bio: string): number {
-  if (!bio) return 0;
-  const lower = bio.toLowerCase();
-  return CATEGORY_KEYWORDS.some(kw => lower.includes(kw)) ? 15 : 0;
+// 动态评分函数
+function scoreBioMatch(bio: string, searchKeywords: string[]): number {
+  if (!bio || searchKeywords.length === 0) return 0;
+  const matchWords = buildBioMatchWords(searchKeywords);
+  const lowerBio = bio.toLowerCase();
+  for (const word of matchWords) {
+    if (lowerBio.includes(word)) return 15;
+  }
+  return 0;
 }
 
-function scoreCompetitorSource(keyword: string): number {
-  if (!keyword) return 0;
-  const lower = keyword.toLowerCase();
-  return COMPETITOR_KEYWORDS.some(kw => lower.includes(kw)) ? 15 : 0;
+function scoreCompetitorSource(creator: Creator, searchKeywords: string[]): number {
+  // 搜索关键词本身就是竞品/产品词
+  if (!creator.search_keyword || searchKeywords.length === 0) return 0;
+  const lowerSearch = creator.search_keyword.toLowerCase();
+  for (const kw of searchKeywords) {
+    if (lowerSearch.includes(kw.toLowerCase())) return 15;
+  }
+  return 0;
 }
 
-function scoreActiveCreator(videoCount: number): number {
-  return videoCount > 30 ? 10 : 0;
+function scoreSceneMatch(creator: Creator, searchKeywords: string[]): number {
+  // 场景词：描述使用场景的词（如 care, routine, how, vlog）
+  if (!creator.search_keyword || searchKeywords.length === 0) return 0;
+  const sceneWords = extractSceneWords(searchKeywords);
+  if (sceneWords.size === 0) return 0;
+  const lowerSearch = creator.search_keyword.toLowerCase();
+  for (const word of sceneWords) {
+    if (lowerSearch.includes(word)) return 10;
+  }
+  return 0;
 }
 
-function scoreSceneSource(keyword: string): number {
-  if (!keyword) return 0;
-  const lower = keyword.toLowerCase();
-  return SCENE_KEYWORDS.some(kw => lower.includes(kw)) ? 10 : 0;
-}
-
-function scoreCollabSignal(bio: string): number {
-  if (!bio) return 0;
-  const lower = bio.toLowerCase();
-  return COLLAB_SIGNALS.some(sig => lower.includes(sig)) ? 10 : 0;
-}
-
-function scoreHasBioLink(bio: string): number {
-  if (!bio) return 0;
-  // 检查是否有常见的落地页信号
-  const linkPatterns = ['link', 'bio', 'website', 'shop', 'store', 'youtube', 'instagram'];
-  return linkPatterns.some(p => bio.toLowerCase().includes(p)) ? 5 : 0;
-}
-
-function scoreViralVideo(plays: number): number {
-  return plays > 100000 ? 5 : 0;
-}
-
-// 计算达人评分（新版：9维度加分制）
+// 计算达人评分（9维度动态评分）
 export function calculateKolScore(
   creator: Creator,
   followerRanges: string[],
   searchKeywords: string[]
 ): KolScore {
-  // 使用搜索关键词中的第一个作为来源关键词
-  const sourceKeyword = searchKeywords[0] || creator.search_keyword || '';
-
   // 各维度得分
   const hasEmail = creator.email ? 30 : 0;
   const sizeMatch = scoreSize(creator.follower_count, followerRanges);
-  const bioCategory = scoreBioCategory(creator.bio || '');
-  const competitorSource = scoreCompetitorSource(sourceKeyword);
-  const activeCreator = scoreActiveCreator(creator.video_count);
-  const sceneSource = scoreSceneSource(sourceKeyword);
-  const collabSignal = scoreCollabSignal(creator.bio || '');
-  const hasBioLink = scoreHasBioLink(creator.bio || '');
-  const viralVideo = scoreViralVideo(creator.best_video_plays);
+  const bioCategory = scoreBioMatch(creator.bio || '', searchKeywords);
+  const competitorSource = scoreCompetitorSource(creator, searchKeywords);
+  const activeCreator = creator.video_count > 30 ? 10 : 0;
+  const sceneSource = scoreSceneMatch(creator, searchKeywords);
+  const collabSignal = COLLAB_SIGNALS.some(sig => (creator.bio || '').toLowerCase().includes(sig)) ? 10 : 0;
+  const hasBioLink = LINK_PATTERNS.some(p => (creator.bio || '').toLowerCase().includes(p)) ? 5 : 0;
+  const viralVideo = creator.best_video_plays > 100000 ? 5 : 0;
 
   const total = hasEmail + sizeMatch + bioCategory + competitorSource +
                  activeCreator + sceneSource + collabSignal + hasBioLink + viralVideo;
@@ -537,9 +579,11 @@ async function searchByKeyword(keyword: string): Promise<Map<string, Creator>> {
 
 async function enrichProfiles(creatorMap: Map<string, Creator>): Promise<void> {
   const creators = Array.from(creatorMap.values());
-  console.log(`\n📋 补全 ${creators.length} 位博主 Profile...`);
+  console.log(`\n📋 Phase 2: 补全 ${creators.length} 位博主的 Profile...`);
 
+  let enriched = 0;
   let emailFound = 0;
+  let bioLinkFound = 0;
 
   for (let i = 0; i < creators.length; i++) {
     const c = creators[i];
@@ -553,43 +597,44 @@ async function enrichProfiles(creatorMap: Map<string, Creator>): Promise<void> {
 
       const fullBio = String(user.signature || '');
       const email = extractEmail(fullBio);
+      const bioLink = user.bioLink?.link ? String(user.bioLink.link) : null;
 
+      // 更新数据
       c.bio = fullBio || c.bio;
       c.nickname = user.nickname || c.nickname;
       c.follower_count = user.followerCount ?? c.follower_count;
       c.video_count = user.videoCount ?? c.video_count;
-      c.avatar_url = user.avatarUri || user.avatarUrl || user.avatar_thumb?.url_list?.[0] || c.avatar_url;
+      c.bio_link = bioLink;
 
-      // Debug avatar
-      if (i === 0) {
-        console.log('  enrichProfiles user keys:', Object.keys(user).join(', '));
-        console.log('  user.avatarUri:', user.avatarUri);
-        console.log('  user.avatarUrl:', user.avatarUrl);
-        console.log('  user.avatar_thumb:', user.avatar_thumb);
+      // 尝试从 video_titles 提取邮箱（有些博主在视频描述留邮箱）
+      let foundEmail = email;
+      if (!foundEmail && c.video_titles) {
+        foundEmail = extractEmailFromTitles(c.video_titles);
       }
 
-      // 补全阶段：如果发现新邮箱，更新它
-      if (email && !c.email) {
-        c.email = email;
+      if (foundEmail && !c.email) {
+        c.email = foundEmail;
         emailFound++;
       }
+      if (bioLink) bioLinkFound++;
+      enriched++;
 
       if ((i + 1) % 10 === 0) {
-        process.stdout.write(`  进度: ${i + 1}/${creators.length}，邮箱+${emailFound}\n`);
+        process.stdout.write(`  进度: ${i + 1}/${creators.length}，邮箱+${emailFound}，链接+${bioLinkFound}\n`);
       }
 
       await sleep(150);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.log(`  ⚠️  补全失败 @${c.unique_id}: ${msg}`);
       if (msg.includes('429') || msg.includes('limit')) {
-        console.log('  ⚠️  API 限速，暂停 10 秒...');
+        console.log(`  ⚠️  触发 API 限速，暂停 10 秒...`);
         await sleep(10000);
       }
+      // 单个失败不中断整体流程
     }
   }
 
-  console.log(`  ✅ 补全完成，邮箱+${emailFound}`);
+  console.log(`  ✅ 补全完成：${enriched} 位，邮箱 ${emailFound} 个，bioLink ${bioLinkFound} 个`);
 }
 
 export async function scrape(keywords: string[], options: ScrapeOptions): Promise<Creator[]> {
