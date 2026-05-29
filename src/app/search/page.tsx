@@ -353,7 +353,7 @@ export default function SearchPage() {
               {savedCreators.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {savedCreators.map((creator) => (
-                    <CreatorTooltip
+                    <CreatorCard
                       key={creator.unique_id}
                       creator={creator}
                       theme={theme}
@@ -362,19 +362,7 @@ export default function SearchPage() {
                       formatNumber={formatNumber}
                       isSaved={true}
                       onToggleSave={toggleSave}
-                      score={creator.score}
-                    >
-                      <CreatorCard
-                        creator={creator}
-                        theme={theme}
-                        copiedEmail={copiedEmail}
-                        onCopyEmail={copyEmail}
-                        formatNumber={formatNumber}
-                        isSaved={true}
-                        onToggleSave={toggleSave}
-                        score={creator.score}
-                      />
-                    </CreatorTooltip>
+                    />
                   ))}
                 </div>
               ) : (

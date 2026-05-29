@@ -18,10 +18,11 @@ interface FilterBarProps {
 }
 
 const RANGES = [
-  { label: '< 10K', value: '0-10000' },
-  { label: '10K-50K', value: '10000-50000' },
-  { label: '50K-100K', value: '50000-100000' },
-  { label: '100K-500K', value: '100000-500000' },
+  { label: '< 1K', value: '0-1000' },
+  { label: '1K-10K', value: '1000-10000' },
+  { label: '10K-100K', value: '10000-100000' },
+  { label: '100K-300K', value: '100000-300000' },
+  { label: '300K-500K', value: '300000-500000' },
   { label: '500K-1M', value: '500000-1000000' },
   { label: '> 1M', value: '1000000-inf' },
 ];
@@ -42,6 +43,84 @@ export function FilterBar({
 }: FilterBarProps) {
   const isDark = theme === 'dark';
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [tagInput, setTagInput] = React.useState('');
+
+  // Sync tagInput when keywords changes from parent (e.g., clear)
+  React.useEffect(() => {
+    const tags = keywords.split(',').map(k => k.trim()).filter(k => k);
+    if (tags.length === 0) {
+      setTagInput('');
+    }
+  }, [keywords]);
+
+  // Parse keywords into tags
+  const keywordTags = keywords
+    .split(',')
+    .map(k => k.trim())
+    .filter(k => k.length > 0);
+
+  const handleTagInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setTagInput(value);
+
+    // If user types comma, add current input as tag
+    if (value.endsWith(',')) {
+      const newTag = value.slice(0, -1).trim();
+      if (newTag) {
+        const currentTags = keywords.split(',').map(k => k.trim()).filter(k => k);
+        if (!currentTags.includes(newTag)) {
+          const newKeywords = currentTags.length > 0
+            ? keywords + ',' + newTag
+            : newTag;
+          onKeywordChange({ target: { value: newKeywords } } as any);
+        }
+      }
+      setTagInput('');
+    }
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && tagInput === '' && keywordTags.length > 0) {
+      // Remove last tag when pressing backspace on empty input
+      const tags = keywords.split(',').map(k => k.trim()).filter(k => k);
+      tags.pop();
+      onKeywordChange({ target: { value: tags.join(',') } } as any);
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (tagInput.trim()) {
+        const newTag = tagInput.trim();
+        const currentTags = keywords.split(',').map(k => k.trim()).filter(k => k);
+        if (!currentTags.includes(newTag)) {
+          const newKeywords = currentTags.length > 0
+            ? keywords + ',' + newTag
+            : newTag;
+          onKeywordChange({ target: { value: newKeywords } } as any);
+        }
+        setTagInput('');
+      }
+    }
+    if (e.key === ',') {
+      e.preventDefault();
+      const newTag = tagInput.trim();
+      if (newTag) {
+        const currentTags = keywords.split(',').map(k => k.trim()).filter(k => k);
+        if (!currentTags.includes(newTag)) {
+          const newKeywords = currentTags.length > 0
+            ? keywords + ',' + newTag
+            : newTag;
+          onKeywordChange({ target: { value: newKeywords } } as any);
+        }
+        setTagInput('');
+      }
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    const tags = keywords.split(',').map(k => k.trim()).filter(k => k);
+    const filtered = tags.filter(t => t !== tagToRemove);
+    onKeywordChange({ target: { value: filtered.join(',') } } as any);
+  };
 
   // Auto collapse on search for mobile
   React.useEffect(() => {
@@ -63,10 +142,10 @@ export function FilterBar({
             }`} />
             <input
               type="text"
-              value={keywords}
-              onChange={onKeywordChange}
-              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-              placeholder="输入关键词，例如：Beauty, Fashion, Tech..."
+              value={tagInput}
+              onChange={handleTagInputChange}
+              onKeyDown={handleTagInputKeyDown}
+              placeholder="输入关键词，按逗号或回车添加标签..."
               className={`w-full pl-12 pr-12 py-3.5 rounded-2xl text-base outline-none transition-all border-2 ${
                 isDark
                   ? 'bg-white/5 border-white/5 text-white focus:bg-white/10 focus:border-teal-500/50'
@@ -104,70 +183,92 @@ export function FilterBar({
           </div>
         </div>
 
+        {/* Keyword Tags */}
+        {keywordTags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {keywordTags.map((tag, i) => (
+              <span
+                key={i}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium ${
+                  isDark
+                    ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                    : 'bg-teal-50 text-teal-700 border border-teal-200'
+                }`}
+              >
+                {tag}
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="ml-1 hover:bg-teal-500/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Filters Row - Collapsible on mobile */}
         <div className={`transition-all duration-300 overflow-hidden ${
           isCollapsed ? 'max-h-0 opacity-0 -mt-4' : 'max-h-[500px] opacity-100'
         }`}>
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-2">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-              <div className="flex flex-col gap-2 sm:gap-3">
-                <span className={`text-sm font-semibold whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>粉丝量范围:</span>
-                <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
-                  {RANGES.map((r) => (
-                    <button
-                      key={r.value}
-                      onClick={() => onRangeToggle(r.value)}
-                      className={`px-1 sm:px-4 py-1.5 rounded-xl text-[10px] sm:text-sm font-bold border transition-all truncate text-center ${
-                        followerRanges.includes(r.value)
-                          ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/20'
-                          : isDark
-                            ? 'border-white/10 text-gray-400 hover:border-white/20 hover:bg-white/5'
-                            : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          {/* Follower Range Buttons - single row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`text-sm font-semibold whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>粉丝量:</span>
+            {RANGES.map((r) => (
+              <button
+                key={r.value}
+                onClick={() => onRangeToggle(r.value)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  followerRanges.includes(r.value)
+                    ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/20'
+                    : isDark
+                      ? 'border-white/10 text-gray-400 hover:border-white/20 hover:bg-white/5'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
 
-              <div className="hidden lg:block w-px h-10 bg-gray-200 dark:bg-white/10" />
-
-              <div className="flex flex-col gap-2 sm:gap-3">
-                <span className={`text-sm font-semibold whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>达人评级:</span>
-                <div className="flex gap-1.5 sm:gap-2">
-                  {['all', 'A', 'B', 'C'].map((g) => (
-                    <button
-                      key={g}
-                      onClick={() => onGradeChange(g as any)}
-                      className={`flex-1 sm:flex-none px-4 py-1.5 rounded-xl text-[10px] sm:text-sm font-bold border transition-all ${
-                        gradeFilter === g
-                          ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/20'
-                          : isDark
-                            ? 'border-white/10 text-gray-400 hover:border-white/20 hover:bg-white/5'
-                            : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {g === 'all' ? '全部' : g + '级'}
-                    </button>
-                  ))}
-                </div>
+          {/* Bottom Row: Grade Filter + Sort + Result Count */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-white/5">
+            {/* Grade Filter */}
+            <div className="flex items-center gap-3">
+              <span className={`text-sm font-semibold whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>达人评级:</span>
+              <div className="flex gap-1.5">
+                {['all', 'A', 'B', 'C'].map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => onGradeChange(g as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                      gradeFilter === g
+                        ? 'bg-teal-600 border-teal-600 text-white shadow-md shadow-teal-600/20'
+                        : isDark
+                          ? 'border-white/10 text-gray-400 hover:border-white/20 hover:bg-white/5'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {g === 'all' ? '全部' : g + '级'}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="flex items-center justify-between lg:justify-end gap-4 sm:gap-6 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-100 dark:border-white/5">
+            {/* Sort + Result Count */}
+            <div className="flex items-center gap-4">
               {resultCount !== undefined && (
-                <span className={`text-xs sm:text-sm font-bold ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                <span className={`text-sm font-bold ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                   检索到 <span className={isDark ? 'text-teal-400' : 'text-teal-600'}>{resultCount}</span> 位
                 </span>
               )}
-              <div className="flex items-center gap-3">
-                <span className={`text-xs sm:text-sm font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>排序:</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>排序:</span>
                 <div className="relative">
                   <select
                     value={sortBy}
                     onChange={(e) => onSortChange(e.target.value)}
-                    className={`text-xs sm:text-sm font-bold py-2 pl-3 pr-8 sm:pr-10 rounded-xl border outline-none appearance-none cursor-pointer transition-all ${
+                    className={`text-xs sm:text-sm font-bold py-2 pl-3 pr-8 rounded-xl border outline-none appearance-none cursor-pointer transition-all ${
                       isDark
                         ? 'bg-zinc-800 border-white/10 text-gray-300 focus:border-teal-500/50'
                         : 'bg-white border-gray-200 text-gray-700 focus:border-teal-500 focus:shadow-sm'
@@ -178,7 +279,7 @@ export function FilterBar({
                     <option value="views">播放量</option>
                     <option value="email">邮箱优先</option>
                   </select>
-                  <ChevronDown className={`absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 pointer-events-none ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
+                  <ChevronDown className={`absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
                 </div>
               </div>
             </div>

@@ -460,11 +460,11 @@ export function calculateKolScore(
   const total = hasEmail + sizeMatch + bioCategory + competitorSource +
                  activeCreator + sceneSource + collabSignal + hasBioLink + viralVideo;
 
-  // 分层标准
+  // 分层标准（满分120）
   let grade: 'A' | 'B' | 'C';
-  if (total >= 60) grade = 'A';
-  else if (total >= 40) grade = 'B';
-  else grade = 'C';
+  if (total >= 90) grade = 'A';      // ≥75%
+  else if (total >= 60) grade = 'B'; // ≥50%
+  else grade = 'C';                  // <50%
 
   return {
     total,
