@@ -3,6 +3,7 @@
 > 发现 TikTok 达人就这么简单 ✨
 
 一个专为营销人员设计的 TikTok 达人发现工具，帮你快速找到最合适的 KOL 进行商业合作。
+<img width="1440" height="813" alt="截屏2026-05-29 14 42 57" src="https://github.com/user-attachments/assets/045074be-1be3-4c3c-b117-a8d10b3b7ff1" />
 
 ---
 
@@ -35,6 +36,10 @@
 | 达人评级 | A/B/C 级，按质量过滤 |
 | 排序方式 | 综合评分 / 粉丝量 / 播放量 / 邮箱优先 |
 
+<img width="1435" height="285" alt="image" src="https://github.com/user-attachments/assets/f3ca6740-8fb6-4e0f-8ee7-3417dc566cda" />
+
+
+
 ### 💯 9 维度智能评分（120分）
 
 每个达人都会得到一个综合评分，从 5 个维度全面评估：
@@ -49,10 +54,17 @@
 
 **A 级达人（≥90分）**：优质合作对象，闭眼选都不会错 👍
 
+示例：
+<img width="306" height="718" alt="image" src="https://github.com/user-attachments/assets/ab439547-c49d-469e-afee-d32890a1ab6a" />
+
+
 ### ⭐ 收藏管理
 - 一键收藏心仪达人，心动不留遗憾 ❤️
 - 收藏列表支持 CSV 导出，方便整理归档 📁
 - localStorage 本地存储，数据安全不丢失 🔒
+<img width="1440" height="615" alt="image" src="https://github.com/user-attachments/assets/0a3035a8-c409-4999-a206-f26b2f751344" />
+
+
 
 ---
 
